@@ -233,11 +233,11 @@ public class FrameworkHandler: IDisposable
 			this.containers[UnitType.Players][ContainerType.Party].Remove(characterPtr->GameObject.EntityId);
 		}
 
-		if (isBound && !VisibilityPlugin.Instance.Configuration.TerritoryTypeWhitelist.Contains(
+		/*if (isBound && !VisibilityPlugin.Instance.Configuration.TerritoryTypeWhitelist.Contains(
 			    Service.ClientState.TerritoryType))
 		{
 			return;
-		}
+		}*/
 
 		if (localPlayer->FreeCompanyTag[0] != 0
 		    && localPlayer->CurrentWorld == localPlayer->HomeWorld
