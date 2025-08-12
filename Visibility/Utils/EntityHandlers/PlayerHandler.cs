@@ -42,9 +42,9 @@ public class PlayerHandler
 		this.UpdateContainers(characterPtr, localPlayer);
 
 		// Check territory whitelist
-		if (isBound && !Configuration.TerritoryTypeWhitelist.Contains(
+		/*if (isBound && !Configuration.TerritoryTypeWhitelist.Contains(
 			    Service.ClientState.TerritoryType))
-			return;
+			return;*/
 
 		// Check void list
 		if (this.voidListManager.CheckAndProcessVoidList(characterPtr))
