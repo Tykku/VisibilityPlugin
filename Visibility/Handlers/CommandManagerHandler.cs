@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Concurrent;
 using System.Linq;
 
 using Dalamud.Game.Command;
@@ -15,17 +16,19 @@ using FFXIVClientStructs.FFXIV.Client.Game.Character;
 
 using Lumina.Excel.Sheets;
 
-using Visibility.Managers;
 
 namespace Visibility.Handlers;
 
 public class CommandManagerHandler: IDisposable
 {
+	private readonly ConcurrentQueue<System.Action> commandQueue = new();
+
 	private readonly VisibilityConfiguration configuration;
 	private readonly Localization pluginLocalization;
 	private readonly FrameworkHandler frameworkHandler;
-	private readonly UiManager uiManager;
 	private readonly FrameworkUpdateHandler frameworkUpdateHandler;
+
+	private System.Action? openConfigUi;
 
 	private static string PluginCommandName => "/pvis";
 	private static string VoidCommandName => "/void";
@@ -37,17 +40,17 @@ public class CommandManagerHandler: IDisposable
 		VisibilityConfiguration config,
 		Localization localization,
 		FrameworkHandler framework,
-		UiManager uiManager,
 		FrameworkUpdateHandler frameworkUpdateHandler)
 	{
 		this.configuration = config;
 		this.pluginLocalization = localization;
 		this.frameworkHandler = framework;
-		this.uiManager = uiManager;
 		this.frameworkUpdateHandler = frameworkUpdateHandler;
 
 		this.RegisterCommands();
 	}
+
+	public void SetOpenConfigUi(System.Action action) => this.openConfigUi = action;
 
 	private void RegisterCommands()
 	{
@@ -96,7 +99,26 @@ public class CommandManagerHandler: IDisposable
 		Service.CommandManager.RemoveHandler(WhitelistTargetCommandName);
 	}
 
-	private void PluginCommand(string command, string arguments)
+	public void ProcessQueue()
+	{
+		while (this.commandQueue.TryDequeue(out System.Action? action))
+		{
+			try
+			{
+				action();
+			}
+			catch (Exception ex)
+			{
+				Service.PluginLog.Error($"Error processing queued command: {ex}");
+			}
+		}
+	}
+
+	private void Enqueue(System.Action action) => this.commandQueue.Enqueue(action);
+
+	private void PluginCommand(string command, string arguments) => this.Enqueue(() => this.PluginCommandHandler(command, arguments));
+
+	private void PluginCommandHandler(string command, string arguments)
 	{
 		if (this.frameworkUpdateHandler.Disable)
 		{
@@ -105,7 +127,7 @@ public class CommandManagerHandler: IDisposable
 
 		if (string.IsNullOrEmpty(arguments))
 		{
-			this.uiManager.OpenConfigUi();
+			this.openConfigUi?.Invoke();
 		}
 		else
 		{
@@ -174,7 +196,9 @@ public class CommandManagerHandler: IDisposable
 		}
 	}
 
-	public void VoidPlayer(string command, string arguments)
+	public void VoidPlayer(string command, string arguments) => this.Enqueue(() => this.VoidPlayerHandler(command, arguments));
+
+	private void VoidPlayerHandler(string command, string arguments)
 	{
 		if (string.IsNullOrEmpty(arguments))
 		{
@@ -265,7 +289,9 @@ public class CommandManagerHandler: IDisposable
 		}
 	}
 
-	private void VoidTargetPlayer(string command, string arguments)
+	private void VoidTargetPlayer(string command, string arguments) => this.Enqueue(() => this.VoidTargetPlayerHandler(command, arguments));
+
+	private void VoidTargetPlayerHandler(string command, string arguments)
 	{
 		if (this.GetTargetPlayer() is { } playerCharacter)
 		{
@@ -312,7 +338,9 @@ public class CommandManagerHandler: IDisposable
 		}
 	}
 
-	public void WhitelistPlayer(string command, string arguments)
+	public void WhitelistPlayer(string command, string arguments) => this.Enqueue(() => this.WhitelistPlayerHandler(command, arguments));
+
+	private void WhitelistPlayerHandler(string command, string arguments)
 	{
 		if (string.IsNullOrEmpty(arguments))
 		{
@@ -405,7 +433,9 @@ public class CommandManagerHandler: IDisposable
 		}
 	}
 
-	private void WhitelistTargetPlayer(string command, string arguments)
+	private void WhitelistTargetPlayer(string command, string arguments) => this.Enqueue(() => this.WhitelistTargetPlayerHandler(command, arguments));
+
+	private void WhitelistTargetPlayerHandler(string command, string arguments)
 	{
 		if (this.GetTargetPlayer() is IPlayerCharacter playerCharacter)
 		{
